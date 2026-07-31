@@ -166,7 +166,7 @@ public class RegistryClient {
     }
 
     public void persist(String key, String value) {
-        log.info("persist key: {}, value: {}", key, value);
+        log.info("persist key: {}, value length: {}", key, value != null ? value.length() : 0);
         registry.put(key, value, false);
     }
 
