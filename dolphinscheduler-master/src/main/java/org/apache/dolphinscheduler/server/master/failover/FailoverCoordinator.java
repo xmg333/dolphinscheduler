@@ -54,6 +54,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class FailoverCoordinator implements IFailoverCoordinator {
 
+    private static final int FAILOVER_BATCH_SIZE = 100;
+    private static final int FAILOVER_MAX_ITERATIONS = 10000;
+
     @Autowired
     private RegistryClient registryClient;
 
@@ -153,33 +156,36 @@ public class FailoverCoordinator implements IFailoverCoordinator {
                 return;
             }
             int totalFailovered = 0;
-            final int batchSize = 100;
-            while (true) {
+            int iterations = 0;
+            final Date failoverDeadlineDate = new Date(workflowFailoverDeadline);
+            while (iterations++ < FAILOVER_MAX_ITERATIONS) {
                 // Always use offset=0: failovered workflows change state to FAILOVER
                 // (which is NOT in NEED_FAILOVER_STATES), so they drop out of the result set.
+                // The deadline filter is pushed to SQL (COALESCE(restart_time, start_time) < deadline)
+                // to avoid loading workflows that started after the crash.
                 final List<WorkflowInstance> batch = workflowInstanceDao
-                        .queryNeedFailoverWorkflowInstancesPaged(masterAddress, 0, batchSize);
+                        .queryNeedFailoverWorkflowInstancesPaged(masterAddress, failoverDeadlineDate, 0, FAILOVER_BATCH_SIZE);
                 if (batch.isEmpty()) {
                     break;
                 }
                 final List<WorkflowInstance> needFailoverWorkflows = batch.stream()
-                        .filter(workflowInstance -> {
-                            if (workflowRepository.contains(workflowInstance.getId())) {
-                                return false;
-                            }
-                            final Date restartTime = workflowInstance.getRestartTime();
-                            if (restartTime != null) {
-                                return restartTime.before(new Date(workflowFailoverDeadline));
-                            }
-                            final Date startTime = workflowInstance.getStartTime();
-                            return startTime.before(new Date(workflowFailoverDeadline));
-                        })
+                        .filter(workflowInstance -> !workflowRepository.contains(workflowInstance.getId()))
                         .collect(Collectors.toList());
                 needFailoverWorkflows.forEach(workflowFailover::failoverWorkflow);
                 totalFailovered += needFailoverWorkflows.size();
-                if (batch.size() < batchSize) {
+                // If no progress was made, all remaining NEED_FAILOVER workflows are already
+                // in this master's repository (being handled). Break to avoid infinite loop.
+                if (needFailoverWorkflows.isEmpty()) {
+                    log.info("Master[{}] failover: remaining {} workflows are already in repository, skipping",
+                            masterAddress, batch.size());
                     break;
                 }
+                if (batch.size() < FAILOVER_BATCH_SIZE) {
+                    break;
+                }
+            }
+            if (iterations > FAILOVER_MAX_ITERATIONS) {
+                log.warn("Master[{}] failover reached max iterations {}", masterAddress, FAILOVER_MAX_ITERATIONS);
             }
             registryClient.persist(masterFailoverNodePath, String.valueOf(workflowFailoverDeadline));
             failoverTimeCost.stop();

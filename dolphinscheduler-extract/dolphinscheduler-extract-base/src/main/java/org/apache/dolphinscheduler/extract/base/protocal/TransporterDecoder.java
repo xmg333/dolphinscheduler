@@ -74,6 +74,11 @@ public class TransporterDecoder extends ReplayingDecoder<TransporterDecoder.Stat
                     throw new TooLongFrameException(
                             "Body length " + bodyLength + " exceeds max frame size " + maxFrameSize);
                 }
+                if ((long) headerLength + bodyLength > maxFrameSize) {
+                    throw new TooLongFrameException(
+                            "Combined header+body length " + (headerLength + bodyLength)
+                                    + " exceeds max frame size " + maxFrameSize);
+                }
                 checkpoint(State.BODY);
             case BODY:
                 body = new byte[bodyLength];

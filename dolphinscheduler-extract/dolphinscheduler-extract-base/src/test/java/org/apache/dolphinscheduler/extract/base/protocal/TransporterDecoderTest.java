@@ -167,15 +167,16 @@ class TransporterDecoderTest {
     }
 
     /**
-     * Verify that a packet with body exactly at maxFrameSize boundary is accepted.
+     * Verify that a packet with body exactly at maxFrameSize boundary (accounting for header)
+     * is accepted by the combined header+body check.
      */
     @Test
-    void bodyAtExactMaxFrameSizeAccepted() {
-        int bodySize = SMALL_MAX_FRAME_SIZE; // exactly at the limit
+    void bodyAtExactCombinedMaxFrameSizeAccepted() {
+        byte[] header = JsonSerializer.serialize(TransporterHeader.of("testMethod"));
+        int bodySize = SMALL_MAX_FRAME_SIZE - header.length; // combined = exactly SMALL_MAX_FRAME_SIZE
         TransporterDecoder decoder = new TransporterDecoder(SMALL_MAX_FRAME_SIZE);
         EmbeddedChannel channel = new EmbeddedChannel(decoder);
 
-        byte[] header = JsonSerializer.serialize(TransporterHeader.of("testMethod"));
         byte[] body = new byte[bodySize];
 
         ByteBuf packet = Unpooled.buffer();
@@ -191,6 +192,31 @@ class TransporterDecoderTest {
         Transporter received = channel.readInbound();
         assertNotNull(received, "Decoded transporter should not be null at boundary size");
         assertEquals(bodySize, received.getBody().length);
+
+        channel.finishAndReleaseAll();
+    }
+
+    /**
+     * Verify that combined header+body length exceeding maxFrameSize is rejected,
+     * even when each individually is within the limit.
+     */
+    @Test
+    void combinedHeaderBodyExceedingMaxFrameSizeRejected() {
+        byte[] header = new byte[600];
+        int bodySize = 600; // both individually < 1024, but combined = 1200 > 1024
+        TransporterDecoder decoder = new TransporterDecoder(SMALL_MAX_FRAME_SIZE);
+        EmbeddedChannel channel = new EmbeddedChannel(decoder);
+
+        ByteBuf packet = Unpooled.buffer();
+        packet.writeByte(Transporter.MAGIC);
+        packet.writeByte(Transporter.VERSION);
+        packet.writeInt(header.length);
+        packet.writeBytes(header);
+        packet.writeInt(bodySize);
+        packet.writeBytes(new byte[bodySize]);
+
+        assertThrows(TooLongFrameException.class, () -> channel.writeInbound(packet),
+                "Expected TooLongFrameException when combined header+body exceeds maxFrameSize");
 
         channel.finishAndReleaseAll();
     }

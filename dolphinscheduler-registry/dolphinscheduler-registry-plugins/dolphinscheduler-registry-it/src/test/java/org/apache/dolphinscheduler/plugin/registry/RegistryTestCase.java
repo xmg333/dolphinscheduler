@@ -158,6 +158,19 @@ public abstract class RegistryTestCase<R extends Registry> {
     }
 
     @Test
+    public void testPutOversizedValueRejected() {
+        registry.start();
+        String key = "/nodes/master" + System.nanoTime();
+        // Create a value larger than 1MB
+        char[] chars = new char[1024 * 1024 + 100];
+        java.util.Arrays.fill(chars, 'x');
+        String oversizedValue = new String(chars);
+
+        assertThrows(RegistryException.class, () -> registry.put(key, oversizedValue, false),
+                "Should throw RegistryException for value exceeding 1MB limit");
+    }
+
+    @Test
     public void testDelete() {
         registry.start();
         String key = "/nodes/master" + System.nanoTime();

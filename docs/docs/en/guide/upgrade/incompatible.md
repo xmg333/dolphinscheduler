@@ -43,4 +43,5 @@ This document records the incompatible updates between each version. You need to
 ## 3.4.1
 
 * Remove import and export of workflow definition. ([#17940])(https://github.com/apache/dolphinscheduler/issues/17940)
+* Reduce `spring.servlet.multipart.max-file-size` and `max-request-size` from 1024MB to 500MB in API server and standalone server. If you need to upload files larger than 500MB, override these values in `application.yaml`. ([#18441](https://github.com/apache/dolphinscheduler/issues/18441))
 

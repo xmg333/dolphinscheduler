@@ -58,6 +58,7 @@ public interface WorkflowInstanceMapper extends BaseMapper<WorkflowInstance> {
      */
     List<WorkflowInstance> queryByHostAndStatusPaged(@Param("host") String host,
                                                      @Param("states") int[] stateArray,
+                                                     @Param("deadline") Date deadline,
                                                      @Param("offset") int offset,
                                                      @Param("size") int size);
 

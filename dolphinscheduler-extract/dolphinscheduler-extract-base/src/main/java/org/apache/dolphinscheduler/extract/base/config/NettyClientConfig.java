@@ -68,7 +68,8 @@ public class NettyClientConfig {
     private int defaultRpcTimeoutMillis = 10_000;
 
     /**
-     * Maximum allowed frame size in bytes for a single RPC message (header + body).
+     * Maximum allowed size in bytes for a single RPC header or body field.
+     * Each of the header and body fields is validated independently against this limit.
      * Frames exceeding this size will be rejected by the decoder to prevent OOM.
      */
     @Builder.Default

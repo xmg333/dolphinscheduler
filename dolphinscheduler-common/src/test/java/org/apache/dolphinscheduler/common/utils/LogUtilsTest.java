@@ -249,4 +249,32 @@ class LogUtilsTest {
         assertEquals(65535, LogUtils.MAX_RESPONSE_LOG_SIZE,
                 "MAX_RESPONSE_LOG_SIZE should be 65535");
     }
+
+    /**
+     * Verify the MAX_LOG_DOWNLOAD_SIZE constant is 64MB.
+     */
+    @Test
+    void maxLogDownloadSizeIs64MB() {
+        assertEquals(64 * 1024 * 1024, LogUtils.MAX_LOG_DOWNLOAD_SIZE,
+                "MAX_LOG_DOWNLOAD_SIZE should be 64MB (67108864 bytes)");
+    }
+
+    /**
+     * Verify that the single-arg getFileContentBytesFromLocal reads a small file fully
+     * (backward compatibility with the new 64MB default cap).
+     */
+    @Test
+    void getFileContentBytesFromLocal_singleArgReadsSmallFile() throws Exception {
+        Path tempFile = Files.createTempFile("ds-logutils-test", ".log");
+        try {
+            String content = "hello world\nthis is a test\n";
+            Files.write(tempFile, content.getBytes(StandardCharsets.UTF_8));
+
+            byte[] result = LogUtils.getFileContentBytesFromLocal(tempFile.toString());
+            assertEquals(content.getBytes(StandardCharsets.UTF_8).length, result.length,
+                    "Single-arg should read entire small file");
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
 }

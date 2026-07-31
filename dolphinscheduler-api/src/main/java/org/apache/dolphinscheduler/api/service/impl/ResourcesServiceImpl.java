@@ -68,6 +68,7 @@ import org.apache.dolphinscheduler.api.validator.resource.UpdateFileRequestTrans
 import org.apache.dolphinscheduler.api.vo.ResourceItemVO;
 import org.apache.dolphinscheduler.api.vo.resources.FetchFileContentResponse;
 import org.apache.dolphinscheduler.common.utils.FileUtils;
+import org.apache.dolphinscheduler.common.utils.LogUtils;
 import org.apache.dolphinscheduler.dao.entity.Tenant;
 import org.apache.dolphinscheduler.dao.entity.User;
 import org.apache.dolphinscheduler.dao.repository.TenantDao;
@@ -79,6 +80,7 @@ import org.apache.dolphinscheduler.spi.enums.ResourceType;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -325,13 +327,13 @@ public class ResourcesServiceImpl extends BaseServiceImpl implements ResourcesSe
                         fetchFileContentRequest.getSkipLineNum(),
                         fetchFileContentRequest.getLimit());
 
-        final int MAX_CONTENT_BYTES = 65535;
+        final int maxContentBytes = LogUtils.MAX_RESPONSE_LOG_SIZE;
         StringBuilder contentBuilder = new StringBuilder();
         int totalBytes = 0;
         for (String line : lines) {
-            int lineBytes = line.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-            if (totalBytes + lineBytes > MAX_CONTENT_BYTES && contentBuilder.length() > 0) {
-                contentBuilder.append("\n[... content truncated at 64KB limit ...]");
+            int lineBytes = line.getBytes(StandardCharsets.UTF_8).length;
+            if (totalBytes + lineBytes > maxContentBytes && contentBuilder.length() > 0) {
+                contentBuilder.append("\n[... content truncated at ").append(maxContentBytes).append(" bytes ...]");
                 break;
             }
             if (contentBuilder.length() > 0) {

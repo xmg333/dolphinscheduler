@@ -64,6 +64,9 @@
                 #{i}
             </foreach>
         </if>
+        <if test="deadline != null">
+            and COALESCE(restart_time, start_time) &lt; #{deadline}
+        </if>
         order by id asc
         limit #{size} offset #{offset}
     </select>
