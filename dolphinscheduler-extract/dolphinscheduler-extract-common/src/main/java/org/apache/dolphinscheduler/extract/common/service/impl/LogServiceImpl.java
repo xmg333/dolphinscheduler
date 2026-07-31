@@ -28,9 +28,16 @@ import org.apache.dolphinscheduler.extract.common.transportor.TaskInstanceLogPag
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
+import java.io.File;
 import java.util.List;
 
 public class LogServiceImpl implements ILogService {
+
+    protected int maxLogQueryLimit = 10000;
+
+    public void setMaxLogQueryLimit(int maxLogQueryLimit) {
+        this.maxLogQueryLimit = maxLogQueryLimit;
+    }
 
     /**
      * Downloads the entire log file for a task instance.
@@ -43,8 +50,16 @@ public class LogServiceImpl implements ILogService {
         final TaskInstanceLogFileDownloadResponse taskInstanceLogFileDownloadResponse =
                 new TaskInstanceLogFileDownloadResponse();
         try {
-            byte[] bytes = LogUtils
-                    .getFileContentBytesFromLocal(taskInstanceLogFileDownloadRequest.getTaskInstanceLogAbsolutePath());
+            String logPath = taskInstanceLogFileDownloadRequest.getTaskInstanceLogAbsolutePath();
+            File logFile = new File(logPath);
+            if (logFile.exists() && logFile.length() > LogUtils.MAX_LOG_DOWNLOAD_SIZE) {
+                taskInstanceLogFileDownloadResponse.setCode(LogResponseStatus.ERROR);
+                taskInstanceLogFileDownloadResponse.setMessage(
+                        "Log file size " + logFile.length() + " exceeds maximum download size "
+                                + LogUtils.MAX_LOG_DOWNLOAD_SIZE);
+                return taskInstanceLogFileDownloadResponse;
+            }
+            byte[] bytes = LogUtils.getFileContentBytesFromLocal(logPath);
             taskInstanceLogFileDownloadResponse.setLogBytes(bytes);
         } catch (Exception e) {
             taskInstanceLogFileDownloadResponse.setCode(LogResponseStatus.ERROR);
@@ -63,12 +78,15 @@ public class LogServiceImpl implements ILogService {
     public TaskInstanceLogPageQueryResponse pageQueryTaskInstanceLog(TaskInstanceLogPageQueryRequest taskInstanceLogPageQueryRequest) {
         final TaskInstanceLogPageQueryResponse taskInstanceLogPageQueryResponse =
                 new TaskInstanceLogPageQueryResponse();
+        // Clamp limit to prevent excessive memory allocation on worker side
+        int limit = Math.min(Math.max(taskInstanceLogPageQueryRequest.getLimit(), 1), maxLogQueryLimit);
+        int skipLineNum = Math.max(taskInstanceLogPageQueryRequest.getSkipLineNum(), 0);
         List<String> lines;
         try {
             lines = LogUtils.readPartFileContentFromLocal(
                     taskInstanceLogPageQueryRequest.getTaskInstanceLogAbsolutePath(),
-                    taskInstanceLogPageQueryRequest.getSkipLineNum(),
-                    taskInstanceLogPageQueryRequest.getLimit());
+                    skipLineNum,
+                    limit);
             taskInstanceLogPageQueryResponse.setLogContent(LogUtils.rollViewLogLines(lines));
         } catch (Exception e) {
             taskInstanceLogPageQueryResponse.setCode(LogResponseStatus.ERROR);
