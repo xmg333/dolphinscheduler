@@ -90,6 +90,11 @@ public class SqlTask extends AbstractTask {
      */
     private static final int QUERY_LIMIT = 10000;
 
+    /**
+     * Maximum allowed query row limit to prevent OOM from unbounded result sets.
+     */
+    private static final int MAX_QUERY_LIMIT = 100000;
+
     private final SQLTaskExecutionContext sqlTaskExecutionContext;
 
     private final DbType dbType;
@@ -373,7 +378,9 @@ public class SqlTask extends AbstractTask {
             if (timeoutFlag) {
                 stmt.setQueryTimeout(taskExecutionContext.getTaskTimeout());
             }
-            stmt.setMaxRows(sqlParameters.getLimit() <= 0 ? QUERY_LIMIT : sqlParameters.getLimit());
+            int effectiveLimit =
+                    sqlParameters.getLimit() <= 0 ? QUERY_LIMIT : Math.min(sqlParameters.getLimit(), MAX_QUERY_LIMIT);
+            stmt.setMaxRows(effectiveLimit);
             Map<Integer, Property> params = sqlBinds.getParamsMap();
             if (params != null) {
                 for (Map.Entry<Integer, Property> entry : params.entrySet()) {
