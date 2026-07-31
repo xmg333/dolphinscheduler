@@ -18,7 +18,9 @@
 package org.apache.dolphinscheduler.server.master.failover;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -96,7 +98,7 @@ class FailoverCoordinatorTest {
         when(masterClusters.getServer(masterAddress)).thenReturn(Optional.empty());
         when(registryClient.getLock(anyString())).thenReturn(registryLock);
         when(registryClient.exists(anyString())).thenReturn(false);
-        when(workflowInstanceDao.queryNeedFailoverWorkflowInstances(masterAddress))
+        when(workflowInstanceDao.queryNeedFailoverWorkflowInstancesPaged(eq(masterAddress), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
 
         failoverCoordinator.failoverMaster(event);

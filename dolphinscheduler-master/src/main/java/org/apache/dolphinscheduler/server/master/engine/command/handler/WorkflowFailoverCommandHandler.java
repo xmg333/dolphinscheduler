@@ -101,7 +101,7 @@ public class WorkflowFailoverCommandHandler extends AbstractCommandHandler {
     @Override
     protected void assembleWorkflowExecutionGraph(final WorkflowExecuteContextBuilder workflowExecuteContextBuilder) {
         final Map<String, TaskInstance> taskInstanceMap =
-                getValidTaskInstance(workflowExecuteContextBuilder.getWorkflowInstance())
+                getValidTaskInstanceLightweight(workflowExecuteContextBuilder.getWorkflowInstance())
                         .stream()
                         .collect(Collectors.toMap(TaskInstance::getName, Function.identity()));
 

@@ -152,40 +152,42 @@ public class FailoverCoordinator implements IFailoverCoordinator {
                         masterFailoverNodePath);
                 return;
             }
-            final List<WorkflowInstance> needFailoverWorkflows =
-                    getFailoverWorkflowsForMaster(masterAddress, new Date(workflowFailoverDeadline));
-            needFailoverWorkflows.forEach(workflowFailover::failoverWorkflow);
+            int totalFailovered = 0;
+            final int batchSize = 100;
+            while (true) {
+                // Always use offset=0: failovered workflows change state to FAILOVER
+                // (which is NOT in NEED_FAILOVER_STATES), so they drop out of the result set.
+                final List<WorkflowInstance> batch = workflowInstanceDao
+                        .queryNeedFailoverWorkflowInstancesPaged(masterAddress, 0, batchSize);
+                if (batch.isEmpty()) {
+                    break;
+                }
+                final List<WorkflowInstance> needFailoverWorkflows = batch.stream()
+                        .filter(workflowInstance -> {
+                            if (workflowRepository.contains(workflowInstance.getId())) {
+                                return false;
+                            }
+                            final Date restartTime = workflowInstance.getRestartTime();
+                            if (restartTime != null) {
+                                return restartTime.before(new Date(workflowFailoverDeadline));
+                            }
+                            final Date startTime = workflowInstance.getStartTime();
+                            return startTime.before(new Date(workflowFailoverDeadline));
+                        })
+                        .collect(Collectors.toList());
+                needFailoverWorkflows.forEach(workflowFailover::failoverWorkflow);
+                totalFailovered += needFailoverWorkflows.size();
+                if (batch.size() < batchSize) {
+                    break;
+                }
+            }
             registryClient.persist(masterFailoverNodePath, String.valueOf(workflowFailoverDeadline));
             failoverTimeCost.stop();
             log.info("Master[{}] failover {} workflows finished, cost: {}/ms",
                     masterAddress,
-                    needFailoverWorkflows.size(),
+                    totalFailovered,
                     failoverTimeCost.getTime());
         }
-    }
-
-    private List<WorkflowInstance> getFailoverWorkflowsForMaster(final String masterAddress,
-                                                                 final Date masterCrashTime) {
-        // todo: use page query
-        final List<WorkflowInstance> workflowInstances =
-                workflowInstanceDao.queryNeedFailoverWorkflowInstances(masterAddress);
-        return workflowInstances.stream()
-                .filter(workflowInstance -> {
-
-                    if (workflowRepository.contains(workflowInstance.getId())) {
-                        return false;
-                    }
-
-                    // todo: If the first time run workflow have the restartTime, then we can only check this
-                    final Date restartTime = workflowInstance.getRestartTime();
-                    if (restartTime != null) {
-                        return restartTime.before(masterCrashTime);
-                    }
-
-                    final Date startTime = workflowInstance.getStartTime();
-                    return startTime.before(masterCrashTime);
-                })
-                .collect(Collectors.toList());
     }
 
     @Override

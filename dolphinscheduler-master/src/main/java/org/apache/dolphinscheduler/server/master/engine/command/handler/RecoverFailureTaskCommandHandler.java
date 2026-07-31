@@ -151,7 +151,7 @@ public class RecoverFailureTaskCommandHandler extends AbstractCommandHandler {
     private List<TaskInstance> dealWithHistoryTaskInstances(
                                                             final WorkflowExecuteContextBuilder workflowExecuteContextBuilder) {
         final WorkflowInstance workflowInstance = workflowExecuteContextBuilder.getWorkflowInstance();
-        final Map<String, TaskInstance> taskInstanceMap = super.getValidTaskInstance(workflowInstance)
+        final Map<String, TaskInstance> taskInstanceMap = super.getValidTaskInstanceLightweight(workflowInstance)
                 .stream()
                 .collect(Collectors.toMap(TaskInstance::getName, Function.identity()));
 
