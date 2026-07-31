@@ -319,13 +319,29 @@ public class ResourcesServiceImpl extends BaseServiceImpl implements ResourcesSe
                 .build();
         fetchFileContentDtoValidator.validate(fetchFileContentDto);
 
-        String content = storageOperator
+        List<String> lines = storageOperator
                 .fetchFileContent(
                         fetchFileContentRequest.getResourceFileAbsolutePath(),
                         fetchFileContentRequest.getSkipLineNum(),
-                        fetchFileContentRequest.getLimit())
-                .stream()
-                .collect(Collectors.joining("\n"));
+                        fetchFileContentRequest.getLimit());
+
+        final int MAX_CONTENT_BYTES = 65535;
+        StringBuilder contentBuilder = new StringBuilder();
+        int totalBytes = 0;
+        for (String line : lines) {
+            int lineBytes = line.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if (totalBytes + lineBytes > MAX_CONTENT_BYTES && contentBuilder.length() > 0) {
+                contentBuilder.append("\n[... content truncated at 64KB limit ...]");
+                break;
+            }
+            if (contentBuilder.length() > 0) {
+                contentBuilder.append("\n");
+                totalBytes += 1;
+            }
+            contentBuilder.append(line);
+            totalBytes += lineBytes;
+        }
+        String content = contentBuilder.toString();
 
         ApiServerMetrics.recordApiResourceDownloadSize(content.length());
 

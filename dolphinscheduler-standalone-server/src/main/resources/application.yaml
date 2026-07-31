@@ -60,8 +60,8 @@ spring:
       org.quartz.scheduler.batchTriggerAcquisitionMaxCount: 25
   servlet:
     multipart:
-      max-file-size: 1024MB
-      max-request-size: 1024MB
+      max-file-size: 500MB
+      max-request-size: 500MB
   messages:
     basename: i18n/messages
   jpa:
