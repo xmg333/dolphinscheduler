@@ -39,6 +39,13 @@ public interface TaskInstanceMapper extends BaseMapper<TaskInstance> {
     List<TaskInstance> findValidTaskListByWorkflowInstanceId(@Param("workflowInstanceId") Integer workflowInstanceId,
                                                              @Param("flag") Flag flag);
 
+    /**
+     * Lightweight query that excludes var_pool and task_params (longtext columns)
+     * to prevent OOM when loading task instances during failover recovery.
+     */
+    List<TaskInstance> findValidTaskListByWorkflowInstanceIdLightweight(@Param("workflowInstanceId") Integer workflowInstanceId,
+                                                                        @Param("flag") Flag flag);
+
     TaskInstance queryByInstanceIdAndCode(@Param("workflowInstanceId") int workflowInstanceId,
                                           @Param("taskCode") Long taskCode);
 

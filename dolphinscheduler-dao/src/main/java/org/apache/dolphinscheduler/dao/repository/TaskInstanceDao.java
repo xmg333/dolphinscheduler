@@ -65,6 +65,12 @@ public interface TaskInstanceDao extends IDao<TaskInstance> {
     List<TaskInstance> queryValidTaskListByWorkflowInstanceId(Integer workflowInstanceId);
 
     /**
+     * Lightweight query that excludes var_pool and task_params (longtext columns)
+     * to prevent OOM when loading task instances during failover recovery.
+     */
+    List<TaskInstance> queryValidTaskListByWorkflowInstanceIdLightweight(Integer workflowInstanceId);
+
+    /**
      * Query list of task instance by workflow instance id and task code
      *
      * @param workflowInstanceId workflowInstanceId

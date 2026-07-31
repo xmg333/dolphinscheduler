@@ -99,6 +99,11 @@ public interface WorkflowInstanceDao extends IDao<WorkflowInstance> {
      */
     List<WorkflowInstance> queryNeedFailoverWorkflowInstances(String masterAddress);
 
+    /**
+     * Query the workflow instances under the master that need to be failover with pagination.
+     */
+    List<WorkflowInstance> queryNeedFailoverWorkflowInstancesPaged(String masterAddress, int offset, int size);
+
     WorkflowInstance queryDetailById(int id);
 
     List<WorkflowInstanceStatusCountDto> countWorkflowInstanceStateByProjectCodes(Date startTime,

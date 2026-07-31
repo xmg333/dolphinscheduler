@@ -183,6 +183,12 @@ public class WorkflowInstanceDaoImpl extends BaseDao<WorkflowInstance, WorkflowI
     }
 
     @Override
+    public List<WorkflowInstance> queryNeedFailoverWorkflowInstancesPaged(String masterAddress, int offset, int size) {
+        return mybatisMapper.queryByHostAndStatusPaged(masterAddress,
+                WorkflowExecutionStatus.NEED_FAILOVER_STATES, offset, size);
+    }
+
+    @Override
     public WorkflowInstance queryDetailById(int id) {
         return mybatisMapper.queryDetailById(id);
     }

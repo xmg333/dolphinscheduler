@@ -54,6 +54,14 @@ public interface WorkflowInstanceMapper extends BaseMapper<WorkflowInstance> {
                                                 @Param("states") int[] stateArray);
 
     /**
+     * query workflow instance by host and stateArray with pagination
+     */
+    List<WorkflowInstance> queryByHostAndStatusPaged(@Param("host") String host,
+                                                     @Param("states") int[] stateArray,
+                                                     @Param("offset") int offset,
+                                                     @Param("size") int size);
+
+    /**
      * query workflow instance host by stateArray
      *
      * @param stateArray
