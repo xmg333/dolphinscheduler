@@ -151,6 +151,15 @@ public abstract class AbstractCommandHandler implements ICommandHandler {
                 workflowInstance.getId());
     }
 
+    /**
+     * Lightweight query that excludes var_pool and task_params (longtext columns)
+     * to prevent OOM when loading task instances during failover recovery.
+     */
+    protected List<TaskInstance> getValidTaskInstanceLightweight(final WorkflowInstance workflowInstance) {
+        return taskInstanceDao.queryValidTaskListByWorkflowInstanceIdLightweight(
+                workflowInstance.getId());
+    }
+
     protected void assembleProject(
                                    final WorkflowExecuteContextBuilder workflowExecuteContextBuilder) {
         final WorkflowDefinition workflowDefinition = workflowExecuteContextBuilder.getWorkflowDefinition();

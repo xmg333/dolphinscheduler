@@ -48,6 +48,7 @@ import org.apache.dolphinscheduler.server.master.engine.workflow.lifecycle.event
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,8 @@ import com.google.common.collect.Lists;
 
 @Slf4j
 public abstract class AbstractTaskStateAction implements ITaskStateAction {
+
+    private static final int MAX_VAR_POOL_SIZE_BYTES = 1024 * 1024; // 1MB
 
     @Autowired
     protected ITaskGroupCoordinator taskGroupCoordinator;
@@ -243,7 +246,15 @@ public abstract class AbstractTaskStateAction implements ITaskStateAction {
         final WorkflowInstance workflowInstance = workflowExecution.getWorkflowInstance();
         final List<Property> finalVarPool = VarPoolUtils.mergeVarPoolJsonString(
                 Lists.newArrayList(workflowInstance.getVarPool(), taskInstance.getVarPool()));
-        workflowInstance.setVarPool(VarPoolUtils.serializeVarPool(finalVarPool));
+        final String serializedVarPool = VarPoolUtils.serializeVarPool(finalVarPool);
+        if (serializedVarPool != null && serializedVarPool
+                .getBytes(StandardCharsets.UTF_8).length > MAX_VAR_POOL_SIZE_BYTES) {
+            log.warn("Workflow instance {} var_pool size exceeds {} bytes after merging task {}, "
+                    + "keeping existing var_pool to avoid invalid JSON truncation",
+                    workflowInstance.getId(), MAX_VAR_POOL_SIZE_BYTES, taskInstance.getName());
+            return;
+        }
+        workflowInstance.setVarPool(serializedVarPool);
     }
 
     protected void persistentTaskInstanceSuccessEventToDB(final ITaskExecution taskExecution,

@@ -54,6 +54,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class FailoverCoordinator implements IFailoverCoordinator {
 
+    private static final int FAILOVER_BATCH_SIZE = 100;
+    private static final int FAILOVER_MAX_ITERATIONS = 10000;
+
     @Autowired
     private RegistryClient registryClient;
 
@@ -152,40 +155,51 @@ public class FailoverCoordinator implements IFailoverCoordinator {
                         masterFailoverNodePath);
                 return;
             }
-            final List<WorkflowInstance> needFailoverWorkflows =
-                    getFailoverWorkflowsForMaster(masterAddress, new Date(workflowFailoverDeadline));
-            needFailoverWorkflows.forEach(workflowFailover::failoverWorkflow);
+            int totalFailovered = 0;
+            int iterations = 0;
+            boolean reachedMaxIterations = true;
+            final Date failoverDeadlineDate = new Date(workflowFailoverDeadline);
+            while (iterations < FAILOVER_MAX_ITERATIONS) {
+                iterations++;
+                // Always use offset=0: failovered workflows change state to FAILOVER
+                // (which is NOT in NEED_FAILOVER_STATES), so they drop out of the result set.
+                // The deadline filter is pushed to SQL (COALESCE(restart_time, start_time) < deadline)
+                // to avoid loading workflows that started after the crash.
+                final List<WorkflowInstance> batch = workflowInstanceDao
+                        .queryNeedFailoverWorkflowInstancesPaged(masterAddress, failoverDeadlineDate, 0,
+                                FAILOVER_BATCH_SIZE);
+                if (batch.isEmpty()) {
+                    reachedMaxIterations = false;
+                    break;
+                }
+                final List<WorkflowInstance> needFailoverWorkflows = batch.stream()
+                        .filter(workflowInstance -> !workflowRepository.contains(workflowInstance.getId()))
+                        .collect(Collectors.toList());
+                needFailoverWorkflows.forEach(workflowFailover::failoverWorkflow);
+                totalFailovered += needFailoverWorkflows.size();
+                // If no progress was made, all remaining NEED_FAILOVER workflows are already
+                // in this master's repository (being handled). Break to avoid infinite loop.
+                if (needFailoverWorkflows.isEmpty()) {
+                    log.info("Master[{}] failover: remaining {} workflows are already in repository, skipping",
+                            masterAddress, batch.size());
+                    reachedMaxIterations = false;
+                    break;
+                }
+                if (batch.size() < FAILOVER_BATCH_SIZE) {
+                    reachedMaxIterations = false;
+                    break;
+                }
+            }
+            if (reachedMaxIterations) {
+                log.warn("Master[{}] failover reached max iterations {}", masterAddress, FAILOVER_MAX_ITERATIONS);
+            }
             registryClient.persist(masterFailoverNodePath, String.valueOf(workflowFailoverDeadline));
             failoverTimeCost.stop();
             log.info("Master[{}] failover {} workflows finished, cost: {}/ms",
                     masterAddress,
-                    needFailoverWorkflows.size(),
+                    totalFailovered,
                     failoverTimeCost.getTime());
         }
-    }
-
-    private List<WorkflowInstance> getFailoverWorkflowsForMaster(final String masterAddress,
-                                                                 final Date masterCrashTime) {
-        // todo: use page query
-        final List<WorkflowInstance> workflowInstances =
-                workflowInstanceDao.queryNeedFailoverWorkflowInstances(masterAddress);
-        return workflowInstances.stream()
-                .filter(workflowInstance -> {
-
-                    if (workflowRepository.contains(workflowInstance.getId())) {
-                        return false;
-                    }
-
-                    // todo: If the first time run workflow have the restartTime, then we can only check this
-                    final Date restartTime = workflowInstance.getRestartTime();
-                    if (restartTime != null) {
-                        return restartTime.before(masterCrashTime);
-                    }
-
-                    final Date startTime = workflowInstance.getStartTime();
-                    return startTime.before(masterCrashTime);
-                })
-                .collect(Collectors.toList());
     }
 
     @Override
