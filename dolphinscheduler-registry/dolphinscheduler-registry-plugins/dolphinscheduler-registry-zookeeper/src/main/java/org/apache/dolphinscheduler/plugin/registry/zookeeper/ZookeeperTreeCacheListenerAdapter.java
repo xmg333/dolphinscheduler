@@ -26,9 +26,15 @@ import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
 import org.apache.curator.framework.recipes.cache.TreeCacheListener;
 
+import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class ZookeeperTreeCacheListenerAdapter implements TreeCacheListener {
+
+    private static final int MAX_ZNODE_DATA_SIZE = 1024 * 1024;
 
     private final String watchedPath;
 
@@ -93,11 +99,20 @@ public class ZookeeperTreeCacheListenerAdapter implements TreeCacheListener {
         }
 
         final ChildData data = event.getData();
+        final byte[] dataBytes = data.getData();
+        final String eventDataStr;
+        if (dataBytes != null && dataBytes.length > MAX_ZNODE_DATA_SIZE) {
+            log.warn("Znode data at path {} size {} exceeds max {}, truncating eventData",
+                    data.getPath(), dataBytes.length, MAX_ZNODE_DATA_SIZE);
+            eventDataStr = "";
+        } else {
+            eventDataStr = dataBytes != null ? new String(dataBytes, StandardCharsets.UTF_8) : "";
+        }
         return Event.builder()
                 .type(type)
                 .watchedPath(watchedPath)
                 .eventPath(data.getPath())
-                .eventData(new String(data.getData()))
+                .eventData(eventDataStr)
                 .build();
     }
 }

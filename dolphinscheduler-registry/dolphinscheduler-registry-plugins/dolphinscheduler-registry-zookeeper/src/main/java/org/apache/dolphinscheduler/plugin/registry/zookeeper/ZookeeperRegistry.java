@@ -55,6 +55,8 @@ import com.google.common.base.Strings;
 @Slf4j
 final class ZookeeperRegistry implements Registry {
 
+    private static final int MAX_REGISTRY_VALUE_SIZE = 1024 * 1024; // 1MB
+
     private final ZookeeperRegistryProperties.ZookeeperProperties properties;
     private final CuratorFramework client;
 
@@ -172,12 +174,18 @@ final class ZookeeperRegistry implements Registry {
     public void put(String key, String value, boolean deleteOnDisconnect) {
         final CreateMode mode = deleteOnDisconnect ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT;
 
+        final byte[] valueBytes = value != null ? value.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        if (valueBytes.length > MAX_REGISTRY_VALUE_SIZE) {
+            throw new RegistryException(
+                    "Registry value for key: " + key + " size exceeds limit " + MAX_REGISTRY_VALUE_SIZE + " bytes");
+        }
+
         try {
             client.create()
                     .orSetData()
                     .creatingParentsIfNeeded()
                     .withMode(mode)
-                    .forPath(key, value.getBytes(StandardCharsets.UTF_8));
+                    .forPath(key, valueBytes);
         } catch (Exception e) {
             throw new RegistryException("Failed to put registry key: " + key, e);
         }

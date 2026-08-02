@@ -17,31 +17,27 @@
 
 package org.apache.dolphinscheduler.registry.api;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Getter
-@ToString
-@Builder
-@AllArgsConstructor
-public class Event {
+import org.junit.jupiter.api.Test;
 
-    // The path which is watched
-    private final String watchedPath;
-    // The full path where the event was generated
-    private final String eventPath;
-    // The value corresponding to the path
-    @ToString.Exclude
-    private final String eventData;
-    // The event type {ADD, REMOVE, UPDATE}
-    private Type type;
+class EventTest {
 
-    public enum Type {
-        ADD,
-        REMOVE,
-        UPDATE
+    @Test
+    void toString_excludesEventData() {
+        String largeData = "VERY_LARGE_EVENT_DATA_THAT_SHOULD_NOT_APPEAR_IN_TO_STRING";
+        Event event = Event.builder()
+                .type(Event.Type.ADD)
+                .watchedPath("/watched")
+                .eventPath("/event")
+                .eventData(largeData)
+                .build();
+
+        String str = event.toString();
+        assertFalse(str.contains(largeData),
+                "toString() should NOT include eventData");
+        assertTrue(str.contains("/watched"), "toString() should include watchedPath");
+        assertTrue(str.contains("/event"), "toString() should include eventPath");
     }
-
 }
