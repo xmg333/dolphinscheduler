@@ -99,4 +99,44 @@ class TaskInstanceDaoImplTest extends BaseDaoTest {
                 .build();
         taskInstanceDao.upsertTaskInstance(ti);
     }
+
+    @Test
+    void findValidTaskListByWorkflowInstanceIdLightweight_excludesVarPoolButKeepsTaskParams() {
+        String taskParams = "{\"rawScript\":\"echo hello\"}";
+        String varPool = "{\"var1\":\"value1\"}";
+
+        TaskInstance ti = TaskInstance.builder()
+                .name("lightweight-task")
+                .taskType("SHELL")
+                .workflowInstanceId(WORKFLOW_INSTANCE_ID)
+                .workflowInstanceName("daily-etl-pipeline")
+                .taskCode(9001L)
+                .taskDefinitionVersion(1)
+                .state(TaskExecutionStatus.SUCCESS)
+                .flag(Flag.YES)
+                .submitTime(new Date())
+                .firstSubmitTime(new Date())
+                .startTime(new Date())
+                .endTime(new Date())
+                .host("192.168.1.50:5678")
+                .executePath("/tmp/dolphinscheduler/exec/" + WORKFLOW_INSTANCE_ID + "/9001")
+                .logPath("/tmp/dolphinscheduler/logs/" + WORKFLOW_INSTANCE_ID + "/9001.log")
+                .taskParams(taskParams)
+                .varPool(varPool)
+                .build();
+        taskInstanceDao.upsertTaskInstance(ti);
+
+        // Full query returns both fields.
+        List<TaskInstance> fullResult = taskInstanceDao.queryValidTaskListByWorkflowInstanceId(WORKFLOW_INSTANCE_ID);
+        assertEquals(1, fullResult.size());
+        assertEquals(taskParams, fullResult.get(0).getTaskParams());
+        assertEquals(varPool, fullResult.get(0).getVarPool());
+
+        // Lightweight query excludes var_pool but retains task_params.
+        List<TaskInstance> lightweightResult = taskInstanceDao
+                .queryValidTaskListByWorkflowInstanceIdLightweight(WORKFLOW_INSTANCE_ID);
+        assertEquals(1, lightweightResult.size());
+        assertEquals(taskParams, lightweightResult.get(0).getTaskParams());
+        assertEquals(null, lightweightResult.get(0).getVarPool());
+    }
 }

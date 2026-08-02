@@ -147,6 +147,11 @@ public class TaskInstanceDaoImpl extends BaseDao<TaskInstance, TaskInstanceMappe
     }
 
     @Override
+    public List<TaskInstance> queryValidTaskListByWorkflowInstanceIdLightweight(Integer processInstanceId) {
+        return mybatisMapper.findValidTaskListByWorkflowInstanceIdLightweight(processInstanceId, Flag.YES);
+    }
+
+    @Override
     public TaskInstance queryByWorkflowInstanceIdAndTaskCode(Integer workflowInstanceId, Long taskCode) {
         return mybatisMapper.queryByInstanceIdAndCode(workflowInstanceId, taskCode);
     }

@@ -28,6 +28,9 @@ import org.apache.dolphinscheduler.dao.BaseDaoTest;
 import org.apache.dolphinscheduler.dao.entity.WorkflowInstance;
 import org.apache.dolphinscheduler.dao.repository.WorkflowInstanceDao;
 
+import java.util.Date;
+import java.util.List;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -123,6 +126,51 @@ class WorkflowInstanceDaoImplTest extends BaseDaoTest {
                 workflowDefinitionVersion, status)));
     }
 
+    @Test
+    void queryNeedFailoverWorkflowInstancesPaged_returnOnlyMatchingHostAndBeforeDeadline() {
+        final String masterAddress = "192.168.1.10:5679";
+        final Date deadline = new Date();
+
+        // Insert one workflow that should be returned: RUNNING_EXECUTION on target host, started before deadline.
+        workflowInstanceDao.insert(createFailoverWorkflowInstance(masterAddress,
+                new Date(deadline.getTime() - 60_000), WorkflowExecutionStatus.RUNNING_EXECUTION));
+
+        // Insert workflows that should NOT be returned.
+        // Wrong host.
+        workflowInstanceDao.insert(createFailoverWorkflowInstance("192.168.1.11:5679",
+                new Date(deadline.getTime() - 60_000), WorkflowExecutionStatus.RUNNING_EXECUTION));
+        // Started after deadline.
+        workflowInstanceDao.insert(createFailoverWorkflowInstance(masterAddress,
+                new Date(deadline.getTime() + 60_000), WorkflowExecutionStatus.RUNNING_EXECUTION));
+        // Not a failover state.
+        workflowInstanceDao.insert(createFailoverWorkflowInstance(masterAddress,
+                new Date(deadline.getTime() - 60_000), WorkflowExecutionStatus.SUCCESS));
+
+        List<WorkflowInstance> result = workflowInstanceDao.queryNeedFailoverWorkflowInstancesPaged(
+                masterAddress, deadline, 0, 100);
+        assertEquals(1, result.size());
+        assertEquals(masterAddress, result.get(0).getHost());
+    }
+
+    @Test
+    void queryNeedFailoverWorkflowInstancesPaged_respectsPageSize() {
+        final String masterAddress = "192.168.1.10:5679";
+        final Date deadline = new Date();
+
+        for (int i = 0; i < 5; i++) {
+            workflowInstanceDao.insert(createFailoverWorkflowInstance(masterAddress,
+                    new Date(deadline.getTime() - i * 60_000L), WorkflowExecutionStatus.RUNNING_EXECUTION));
+        }
+
+        List<WorkflowInstance> firstPage = workflowInstanceDao.queryNeedFailoverWorkflowInstancesPaged(
+                masterAddress, deadline, 0, 2);
+        assertEquals(2, firstPage.size());
+
+        List<WorkflowInstance> secondPage = workflowInstanceDao.queryNeedFailoverWorkflowInstancesPaged(
+                masterAddress, deadline, 2, 2);
+        assertEquals(2, secondPage.size());
+    }
+
     private WorkflowInstance createWorkflowInstance(Long workflowDefinitionCode, int workflowDefinitionVersion,
                                                     WorkflowExecutionStatus status) {
         WorkflowInstance workflowInstance = new WorkflowInstance();
@@ -130,6 +178,18 @@ class WorkflowInstanceDaoImplTest extends BaseDaoTest {
         workflowInstance.setWorkflowDefinitionCode(workflowDefinitionCode);
         workflowInstance.setWorkflowDefinitionVersion(workflowDefinitionVersion);
         workflowInstance.setState(status);
+        return workflowInstance;
+    }
+
+    private WorkflowInstance createFailoverWorkflowInstance(String host, Date startTime,
+                                                            WorkflowExecutionStatus status) {
+        WorkflowInstance workflowInstance = new WorkflowInstance();
+        workflowInstance.setName("WorkflowInstance" + System.currentTimeMillis());
+        workflowInstance.setWorkflowDefinitionCode(1L);
+        workflowInstance.setWorkflowDefinitionVersion(1);
+        workflowInstance.setState(status);
+        workflowInstance.setHost(host);
+        workflowInstance.setStartTime(startTime);
         return workflowInstance;
     }
 
